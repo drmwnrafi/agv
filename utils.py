@@ -1,4 +1,14 @@
 import crcmod
+import binascii
+
+def extract_sensors_value(serial_client, slave):
+    byte_string = serial_client.read(9)
+    if byte_string[0] == slave:
+        hex_string = binascii.hexlify(byte_string).decode('utf-8')
+        hex_list = [hex(i) for i in byte_string]
+        value = hex_list[3:-4]
+        combined_hex = (int(value[0], 16) << 8) | int(value[1], 16)
+    return conversion_magnetic(combined_hex)
 
 def conversion_magnetic(value):
     median = (value-256)*0.00390625+1
