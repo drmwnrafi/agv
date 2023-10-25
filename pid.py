@@ -1,49 +1,65 @@
 from simple_pid import PID
-from pymodbus.client import ModbusSerialClient
+import serial
 import time
 import utils
 
-client = ModbusSerialClient(method='rtu', port="/dev/ttyUSB0", baudrate=115200, parity='N', timeout=1)
-connection = client.connect()
+client = serial.Serial(
+    port='/dev/ttyUSB0',
+    baudrate = 115200,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+    timeout=1
+)
 mode = 'velocity'
 
-pid_motor1 = PID(Kp=1.0, Ki=0.1, Kd=0.01)
-pid_motor2 = PID(Kp=1.0, Ki=0.1, Kd=0.01)
+basespeed = 18
+maxspeed = 25
 
-setpoint = 8
-output_min = -25  
-output_max = 25
+def pid(kp, ki, kd, current_point, last_error, set_point=8):
+    error = set_point-current_point
+    p = error
+    i = i + error 
+    d = error - last_error
+    last_error = error
+    motorspeed = p*kp + i*ki + d*kd
+    motor_speed_1 = basespeed + motorspeed
+    motor_speed_2 = basespeed - motorspeed
+    if motor_speed_1 > maxspeed:
+        motor_speed_1 = maxspeed
+    elif motor_speed_2 > maxspeed:
+        motor_speed_2 = maxspeed
+    elif motor_speed_1 < 0:
+        motor_speed_1 = 0
+    elif motor_speed_2 < 0:
+        motor_speed_2 = 0
+    return motor_speed_1, motor_speed_2, last_error
 
-sensor_value = None
+kp, ki, kd = 0.93, 0, 0
 
-pid_motor1.setpoint = setpoint
-pid_motor2.setpoint = setpoint
-
-# while True:
-#     try :
-#         read = client.read_holding_registers(0, 2, 5)
-#         sensor_value = utils.conversion_magnetic(read.registers[0])
-
-#         motor1_output = pid_motor1(sensor_value)
-#         motor2_output = pid_motor2(sensor_value)
-
-#         motor1_output = max(output_min, min(output_max, motor1_output))
-#         motor2_output = max(output_min, min(output_max, motor2_output))
-
-#         print(f"Motor 1 Output: {-(motor1_output)}, Motor 2 Output: {motor2_output}")
-#         utils.send_to_motor(1, -(int(motor1_output)), mode, client)
-#         utils.send_to_motor(2, int(motor2_output), mode, client)
-
-#         time.sleep(0.1)
-#     except :
-#         client.close()
-
-# client.write_register(2, 2, 5)
-read = client.read_holding_registers(0, 2, 3)
+i = 0
+last_error = 0
+last_point = 0
 
 while True:
-    try :
-        sensor_value = utils.conversion_magnetic(read.registers[0])
-        print(sensor_value)
-    except :
-        print("------")
+    current_point = utils.extract_sensors_value(client, 3)
+    if  current_point == None:
+        current_point = last_point
+    last_point = current_point
+    error = 8-current_point
+    p = error
+    i = i + error 
+    d = error - last_error
+    last_error = error
+    motorspeed = p*kp + i*ki + d*kd
+    motor_speed_1 = basespeed + motorspeed
+    motor_speed_2 = basespeed - motorspeed
+    if motor_speed_1 > maxspeed:
+        motor_speed_1 = maxspeed
+    elif motor_speed_2 > maxspeed:
+        motor_speed_2 = maxspeed
+    elif motor_speed_1 < 0:
+        motor_speed_1 = 0
+    elif motor_speed_2 < 0:
+        motor_speed_2 = 0
+    print(motor_speed_1, motor_speed_2)

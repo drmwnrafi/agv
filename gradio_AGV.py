@@ -1,9 +1,18 @@
 import gradio as gr
-from pymodbus.client import ModbusSerialClient
 import utils
+import serial
+import time
+import threading
 
-client = ModbusSerialClient(method='rtu', port="/dev/ttyUSB1", baudrate=115200, parity='N', timeout=1)
-connection = client.connect()
+client = serial.Serial(
+    port='/dev/ttyUSB0',
+    baudrate = 115200,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+    timeout=1
+)
+
 mode = "velocity"
 
 toggle_line = 0
@@ -57,30 +66,66 @@ def left_curve():
     return "Left"
 
 def stop():
-    global line_follow 
-    line_follow = 0
     utils.send_to_motor(1, 0, mode, client)
     utils.send_to_motor(2, 0, mode, client)
     print("Robot should stop here")
     return "Stop"
 
+def stop_line():
+    global line_follow 
+    line_follow = 0
+    return "Line Following Stop"
+
 def line():
     global line_follow, line_thread
-    line_follow = 1
+    
     set_point = 8.51953125
-    temp_sensor = None
+    temp_sensor = 0
+    basespeed = 18
+    maxspeed = 28
+    kp, ki, kd = 0.95, 0, 0
 
+    i = 0
+    last_error = 0
+    line_follow = 1
+    first = 1
     while line_follow == 1:
-        read = client.read_holding_registers(0, 2, 3)
-        sensor = utils.conversion_magnetic(read.registers[0])
-        print(sensor)
-        if sensor > set_point or temp_sensor == 16:
-            utils.send_to_motor(1, -10, mode, client)
-            utils.send_to_motor(2, 25, mode, client)
-        elif sensor < set_point or temp_sensor == 0:
-            utils.send_to_motor(1, -25, mode, client)
-            utils.send_to_motor(2, 10, mode, client)
-        temp_sensor = sensor
+        # sensor = utils.extract_sensors_value(client, 3)
+        # if sensor != None:
+        #     if sensor > set_point or temp_sensor == 16:
+        #         utils.send_to_motor(1, -10, mode, client)
+        #         utils.send_to_motor(2, 25, mode, client)
+        #     elif sensor < set_point or temp_sensor == 0:
+        #         utils.send_to_motor(1, -25, mode, client)
+        #         utils.send_to_motor(2, 10, mode, client)
+        # temp_sensor = sensor
+        if first ==1:
+            temp_sensor = utils.extract_sensors_value(client, 3)
+        first = 0
+        current_point = utils.extract_sensors_value(client, 3)
+        if  current_point == None:
+            current_point = temp_sensor
+        
+        error = set_point-current_point
+        p = error
+        i = i + error 
+        d = error - last_error
+        last_error = error
+        motorspeed = p*kp + i*ki + d*kd
+        motor_speed_1 = basespeed + motorspeed
+        motor_speed_2 = basespeed - motorspeed
+        if motor_speed_1 > maxspeed:
+            motor_speed_1 = maxspeed
+        elif motor_speed_2 > maxspeed:
+            motor_speed_2 = maxspeed
+        elif motor_speed_1 < 0:
+            motor_speed_1 = 0
+        elif motor_speed_2 < 0:
+            motor_speed_2 = 0
+        print(motor_speed_1, motor_speed_2)
+        utils.send_to_motor(1, -(int(motor_speed_2)), mode, client)
+        utils.send_to_motor(2, int(motor_speed_1), mode, client)
+        temp_sensor = current_point
 
 with gr.Blocks() as demo:
     direction_text = gr.Textbox(label="Robot Direction")
@@ -100,6 +145,7 @@ with gr.Blocks() as demo:
             button_right_down = gr.Button(value="↘️")
 
     line_follow = gr.Button(value="Line Follower")
+    line_follow_stop = gr.Button(value="Stop Line Follower")
 
     button_up.click(up, outputs=[direction_text])
     button_down.click(down, outputs=[direction_text])
@@ -111,6 +157,7 @@ with gr.Blocks() as demo:
     button_right_curve.click(right_curve, outputs=[direction_text])
     button_stop.click(stop, outputs=[direction_text])
     line_follow.click(line, outputs=[direction_text])
+    line_follow_stop.click(stop_line, outputs=[direction_text])
 
 
 if __name__=="__main__":

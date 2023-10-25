@@ -1,14 +1,10 @@
 import crcmod
-import binascii
 
-def extract_sensors_value(serial_client, slave):
+def extract_sensors_value(serial_client, slave, fn_code=3):
     byte_string = serial_client.read(9)
-    if byte_string[0] == slave:
-        hex_string = binascii.hexlify(byte_string).decode('utf-8')
-        hex_list = [hex(i) for i in byte_string]
-        value = hex_list[3:-4]
-        combined_hex = (int(value[0], 16) << 8) | int(value[1], 16)
-    return conversion_magnetic(combined_hex)
+    if  byte_string != b'' and byte_string[0] == slave and byte_string[1] == fn_code:
+        value = int.from_bytes(byte_string[3:-4], byteorder='big')
+        return conversion_magnetic(value)
 
 def conversion_magnetic(value):
     median = (value-256)*0.00390625+1
@@ -22,8 +18,8 @@ def map_value(inp_val, inp_min, inp_max, out_min, out_max):
 
 def twos_complement_to_hex(twos_complement, num_bits):
     if twos_complement < 0:
-        positive_value = (abs(twos_complement) ^ (1 << num_bits)-1) + 1
-        # positive_value = (twos_complement & (1 << num_bits)-1)
+        # positive_value = (abs(twos_complement) ^ (1 << num_bits)-1) + 1
+        positive_value = (twos_complement & (1 << num_bits)-1)
     else:
         positive_value = twos_complement
     hex_value = f"{positive_value:0{num_bits//4}x}"
@@ -46,8 +42,7 @@ def send_to_motor(id, value, mode, client):
     byte_string = bytes(int(byte, 16) for byte in command)
     checksum = bytes([crc8(byte_string)])
     command_bytes = byte_string + checksum
-    # print(command_bytes, checksum)
-    client.send(command_bytes)
+    client.write(command_bytes)
 
 def send_command(command:str):
     crc8 = crcmod.predefined.mkCrcFun('crc-8-maxim')
