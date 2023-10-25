@@ -51,7 +51,7 @@ def generate_command(command:str):
 
 def get_feedback_rpm(id, client):
     command = f"{id:02d} 74 00 00 00 00 00 00 00"
-    command = send_command(command)
+    command = generate_command(command)
     client.write(command)
     v_fb = int.from_bytes(client.read(10)[4:6], byteorder='little')
     return v_fb
