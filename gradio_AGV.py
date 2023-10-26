@@ -80,32 +80,20 @@ def line():
     global line_follow, line_thread
     
     set_point = 8.51953125
-    temp_sensor = 0
     basespeed = 18
     maxspeed = 28
     kp, ki, kd = 0.95, 0, 0
-
     i = 0
+
+    temp_sensor = 8.5
     last_error = 0
     line_follow = 1
-    first = 1
+
     while line_follow == 1:
-        # sensor = utils.extract_sensors_value(client, 3)
-        # if sensor != None:
-        #     if sensor > set_point or temp_sensor == 16:
-        #         utils.send_to_motor(1, -10, mode, client)
-        #         utils.send_to_motor(2, 25, mode, client)
-        #     elif sensor < set_point or temp_sensor == 0:
-        #         utils.send_to_motor(1, -25, mode, client)
-        #         utils.send_to_motor(2, 10, mode, client)
-        # temp_sensor = sensor
-        if first ==1:
-            temp_sensor = utils.extract_sensors_value(client, 3)
-        first = 0
         current_point = utils.extract_sensors_value(client, 3)
+        print(f"temp : {temp_sensor} || curr : {current_point}")
         if  current_point == None:
             current_point = temp_sensor
-        
         error = set_point-current_point
         p = error
         i = i + error 

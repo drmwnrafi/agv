@@ -1,6 +1,5 @@
 import serial.tools.list_ports
 
-# List all available serial ports
 ports = list(serial.tools.list_ports.comports())
 
 if len(ports) == 0:
