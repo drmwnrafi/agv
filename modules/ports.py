@@ -7,4 +7,4 @@ if len(ports) == 0:
 else:
     print("Available serial ports:")
     for port, desc, hwid in ports:
-        print(f"Port: {port}, Description: {desc}, Hardware ID: {hwid}")
+        print(f"Port: {port}, Description: {desc}")

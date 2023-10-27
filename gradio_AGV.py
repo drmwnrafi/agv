@@ -10,12 +10,11 @@ client = serial.Serial(
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
     bytesize=serial.EIGHTBITS,
-    timeout=1
 )
 
 mode = "velocity"
 
-toggle_line = 0
+line_follow = 0
 
 def up():
     utils.send_to_motor(1, -25, mode, client)
@@ -66,31 +65,50 @@ def left_curve():
     return "Left"
 
 def stop():
+    global line_follow
+    if line_follow == 1:
+        line_follow = 0
+        time.sleep(0.5)
     utils.send_to_motor(1, 0, mode, client)
     utils.send_to_motor(2, 0, mode, client)
     print("Robot should stop here")
     return "Stop"
 
-def stop_line():
-    global line_follow 
-    line_follow = 0
-    return "Line Following Stop"
 
 def line():
-    global line_follow, line_thread
+    global line_follow
     
-    set_point = 8.51953125
-    basespeed = 18
-    maxspeed = 28
+    set_point = 8.5
+    basespeed = 25
+    maxspeed = 35
     kp, ki, kd = 0.95, 0, 0
-    i = 0
 
     temp_sensor = 8.5
     last_error = 0
     line_follow = 1
+    i=0
+
+    last_output = None
+    second_output = None
+    third_output = None
+    fourth_output = None
+    fifth_output = None
+    
+    v = 8.5
 
     while line_follow == 1:
-        current_point = utils.extract_sensors_value(client, 3)
+        out = client.read(1)
+
+        fifth_output = fourth_output
+        fourth_output = third_output
+        third_output = second_output
+        second_output = last_output
+        last_output = out
+
+        if third_output == b'\x04' and fourth_output == b'\x03' and fifth_output == b'\x03':
+            v = int.from_bytes(second_output+last_output, byteorder='big')
+
+        current_point = utils.conversion_magnetic(v)
         print(f"temp : {temp_sensor} || curr : {current_point}")
         if  current_point == None:
             current_point = temp_sensor
@@ -115,6 +133,8 @@ def line():
         utils.send_to_motor(2, int(motor_speed_1), mode, client)
         temp_sensor = current_point
 
+
+
 with gr.Blocks() as demo:
     direction_text = gr.Textbox(label="Robot Direction")
 
@@ -133,7 +153,6 @@ with gr.Blocks() as demo:
             button_right_down = gr.Button(value="↘️")
 
     line_follow = gr.Button(value="Line Follower")
-    line_follow_stop = gr.Button(value="Stop Line Follower")
 
     button_up.click(up, outputs=[direction_text])
     button_down.click(down, outputs=[direction_text])
@@ -145,12 +164,11 @@ with gr.Blocks() as demo:
     button_right_curve.click(right_curve, outputs=[direction_text])
     button_stop.click(stop, outputs=[direction_text])
     line_follow.click(line, outputs=[direction_text])
-    line_follow_stop.click(stop_line, outputs=[direction_text])
 
 
 if __name__=="__main__":
   try:
-    demo.launch()
+    demo.launch(share=True)
   except KeyboardInterrupt:
     demo.clear()
     demo.close()

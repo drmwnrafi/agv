@@ -1,7 +1,14 @@
 import crcmod
 
+# def senses(client, slave, fn_cod=0):
+#     bytes = b''
+#     out = client.read()
+#     if out == slave:
+#         bytes = 
+
 def extract_sensors_value(serial_client, slave, fn_code=3):
     byte_string = serial_client.read(9)
+    print(byte_string)
     if  byte_string != b'' and byte_string[0] == slave and byte_string[1] == fn_code:
         value = int.from_bytes(byte_string[3:-4], byteorder='big')
         return conversion_magnetic(value)
@@ -9,7 +16,7 @@ def extract_sensors_value(serial_client, slave, fn_code=3):
 def conversion_magnetic(value):
     median = (value-256)*0.00390625+1
     if median % 1 != 0:
-        median = median + 0.5
+        median = round(median + 0.5, 1)
     return median
 
 def map_value(inp_val, inp_min, inp_max, out_min, out_max):
@@ -23,7 +30,7 @@ def twos_complement(value, num_bits):
         positive_value = value.to_bytes(int(num_bits/8), 'big')
     return positive_value
 
-def send_to_motor(id, value, mode, client=None):
+def send_to_motor(id, value, mode, client):
     crc8 = crcmod.predefined.mkCrcFun('crc-8-maxim')
     command = command_conversion(id, value, mode=mode)
     checksum = crc8(command).to_bytes(1, 'big')
@@ -51,7 +58,8 @@ def generate_command(command:str):
 
 def get_feedback_rpm(id, client):
     command = f"{id:02d} 74 00 00 00 00 00 00 00"
-    command = send_command(command)
+    command = generate_command(command)
     client.write(command)
     v_fb = int.from_bytes(client.read(10)[4:6], byteorder='little')
     return v_fb
+

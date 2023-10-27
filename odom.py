@@ -1,39 +1,90 @@
 from math import cos, sin,radians, degrees
+import matplotlib.pyplot as plt
+import utils
+import serial
+import time
 
-# meter
-radius = 0.05
-wheelbase = 0.433
+client = serial.Serial(
+    port='/dev/ttyUSB0',
+    baudrate = 115200,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+)
+
 x_local = 0
 y_local = 0
-
-# deg/s
-v_motor_kanan = 10
-v_motor_kiri = 9
-
-# deg
 psi = 0
-
-# m/s
 vx_local = 0
 vy_local = 0
 
-omega = radius*(v_motor_kanan-v_motor_kiri)/wheelbase
-psi += omega
+def hitung(kanan, kiri):
+    global x_local, y_local, psi, vx_local, vy_local
 
-if psi > 360:
-    psi -= 360
-elif psi < 0:
-    psi+=360
+    radius = 0.05
+    wheelbase = 0.433
 
-vx_local = radius*(v_motor_kanan*cos(radians(psi))+v_motor_kiri*cos(radians(psi)))/2
-vy_local = radius*(v_motor_kanan*sin(radians(psi))+v_motor_kiri*sin(radians(psi)))/2
+    # deg/s
+    v_motor_kanan = kanan/60*radius
+    v_motor_kiri = kiri/60*radius
 
-x_local += vx_local
-y_local += vy_local
+    omega = radius*(v_motor_kanan-v_motor_kiri)/wheelbase
+    psi += omega
 
-print("x_local : ",x_local)
-print("y_local : ",y_local)
-print("vx_local : ",vx_local)
-print("vy_local : ",vy_local)
-print("psi : ", degrees(psi))
-print("omega : ", degrees(omega))
+    if psi > 360:
+        psi -= 360
+    elif psi < 0:
+        psi+=360
+
+    vx_local = radius*(v_motor_kanan*cos(radians(psi))+v_motor_kiri*cos(radians(psi)))/2
+    vy_local = radius*(v_motor_kanan*sin(radians(psi))+v_motor_kiri*sin(radians(psi)))/2
+
+    x_local += vx_local
+    y_local += vy_local
+
+    return x_local, y_local
+
+x_history = []
+y_history = []
+
+value1 = 25
+
+start_time = time.time()
+
+# utils.send_to_motor(1, 0, 'velocity', client)
+# utils.send_to_motor(2, 0, 'velocity', client)
+
+while time.time() - start_time <= 10:  # Run for 10 seconds
+    current_time = time.time() - start_time  # Calculate elapsed time
+
+    if current_time < 5:
+        x, y = hitung(25, 25)
+        x_history.append(x)
+        y_history.append(y)
+        time.sleep(0.001)
+    elif current_time < 3:
+        x, y = hitung(0, 330)
+        x_history.append(x)
+        y_history.append(y)
+        time.sleep(0.001)
+    elif current_time < 3:
+        x, y = hitung(330,0)
+        x_history.append(x)
+        y_history.append(y)
+        time.sleep(0.001)
+    else:
+        x, y = hitung(25, 25)
+        x_history.append(x)
+        y_history.append(y)
+        time.sleep(0.001)
+
+
+plt.figure()
+plt.plot(x_history, y_history, label='Robot Path')
+plt.xlabel('X Local (m)')
+plt.ylabel('Y Local (m)')
+plt.title('Robot Movement')
+plt.legend()
+plt.grid()
+plt.axis('equal')
+plt.show()

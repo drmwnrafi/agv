@@ -1,4 +1,4 @@
-class PID():
+class PID(object):
     def __init__(self, kp, ki, kd, target):
         self.kp = kp
         self.ki = ki
