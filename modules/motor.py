@@ -1,5 +1,6 @@
 import serial
 import crcmod
+import math
 
 map = lambda x, in_min, in_max, out_min, out_max: (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 constrain = lambda x, min, max: min if x < min else max if x > max else x
@@ -9,6 +10,7 @@ class MOTOR(object):
         self.client = client
         self.id = id
         self.crc8 = crcmod.predefined.mkCrcFun('crc-8-maxim')
+        self.v_fb = 0
 
     def generate_command_str(self, command:str) -> bytes:
         command = bytes.fromhex(command)
@@ -48,20 +50,23 @@ class MOTOR(object):
         command = f"{self.id:02d} 74 00 00 00 00 00 00 00"
         command = self.generate_command_str(command)
         self.client.write(command)
-        output = self.client.read(10)
+        output = self.client.read(1)
+        print(output)
+        if output[1] == self.id.to_bytes(1, 'big'):
+            self.v_fb = int.from_bytes(output[4:6], byteorder='little')
+        # torque_fb = int.from_bytes(output[2:3], byteorder='little')
+        # mode = int.from_bytes(output[1], byteorder='big')
 
-        v_fb = int.from_bytes(output[4:6], byteorder='little')
-        torque_fb = int.from_bytes(output[2:3], byteorder='little')
-        mode = int.from_bytes(output[1], byteorder='big')
-
-        vel = map(constrain(v_fb,-32767,32767), -32767, 32767, -330, 330)
-        return mode, torque_fb, vel
+        # vel = map(constrain(v_fb,-32767,32767), -32767, 32767, -330, 330)
+        vel = self.v_fb/256
+        return vel
     
     def get_linear_velocity(self, radius) -> float:
         """
         radius : Any = radius of wheel
         """
         mode, tor, vel = self.get_feedback()
+        rpm = vel/256 # revolutions per minutes
         if vel is None:
             return None
-        return vel/60 * radius
+        return (2 * math.pi * radius)/60 * rpm # m/s
